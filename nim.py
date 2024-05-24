@@ -282,7 +282,7 @@ def play(ai, human_player=None):
     if human_player is None:
         human_player = random.randint(0, 1)
 
-    print(f"LENGTH: {len(ai.q)}")
+    print(f"LENGTH: {ai.q.values()}")
 
     # Create new game
     game = Nim()
