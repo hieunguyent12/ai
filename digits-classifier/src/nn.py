@@ -1,15 +1,9 @@
 import numpy as np
-import pandas as pd
 import arff
-import matplotlib.pyplot as plt
-from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
 import gzip
 import pickle as cPickle
-
-
-rgen = np.random.RandomState()
+import os
 
 
 def labels_to_onehot(j):
@@ -112,7 +106,7 @@ class Network:
 
     def fit2(self, X, y):
         for _ in range(self.epochs):
-            minibatch_gen = minibatch_generator(X, y, 10)
+            minibatch_gen = minibatch_generator(X, y, 3)
             for X_, y_ in minibatch_gen:
                 activations = [X_]
                 zs = []
@@ -190,13 +184,22 @@ class Network:
     def sigmoid_prime(self, z):
         return self.sigmoid(z) * (1 - self.sigmoid(z))
 
+    def save_model(self, path):
+        output = open(path, "wb")
+        cPickle.dump(self.layers, output)
+        output.close()
 
-def check(outputs, expectedOutputs):
-    right = 0
-    for output, expected in zip(outputs, expectedOutputs):
-        if output == expected:
-            right += 1
-    return right, len(outputs)
+    @classmethod
+    def from_model(cls, path):
+        if os.path.exists(os.path.join(os.getcwd(), path)):
+            model = open(path, "rb")
+            data = cPickle.load(model)
+            nn = cls([])
+            nn.layers = data
+            model.close()
+            return nn
+        else:
+            raise FileNotFoundError("model doesn't exist")
 
 
 def load_data():
@@ -222,38 +225,41 @@ def load_data_wrapper():
 
 
 def run():
-    # (training_inputs, training_results, test_inputs, test_results) = load_data_wrapper()
-    data = arff.load(open("datasets/mnist_784.arff"))["data"]
-    inputs = []
-    outputs = []
-    for item in data:
-        inputs.append(item[:-1])
-        outputs.append(labels_to_onehot(item[-1]))
-    inputs = np.array(inputs)
-    outputs = np.array(outputs)
+    model_path = "model.pkl"
+    nn = Network.from_model(model_path)
+    (training_inputs, training_results, test_inputs, test_results) = load_data_wrapper()
+    # data = arff.load(open("datasets/iris.arff"))["data"]
+    # inputs = []
+    # outputs = []
+    # for item in data:
+    #     inputs.append(item[:-1])
+    #     outputs.append(item[-1])
+    #     # outputs.append(labels_to_onehot(item[-1]))
+    # outputs = labels_to_onehot(outputs)
+    # inputs = np.array(inputs)
+    # outputs = np.array(outputs)
 
-    # we MUST scale the pixel values into range of [-1, 1] for some reason?
-    inputs = ((inputs / 255.0) - 0.5) * 2
+    # # we MUST scale the pixel values into range of [-1, 1] for some reason?
+    # # inputs = ((inputs / 255.0) - 0.5) * 2
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        inputs,
-        outputs,
-        test_size=0.2,
-        random_state=1,
-        shuffle=True,
-    )
+    # X_train, X_test, y_train, y_test = train_test_split(
+    #     inputs,
+    #     outputs,
+    #     test_size=0.2,
+    #     random_state=1,
+    #     shuffle=True,
+    # )
 
-    nn = Network([784, 30, 10], epochs=30, eta=3)
-    nn.fit2(np.array(X_train), np.array(y_train))
-    # print(training_inputs[0])
-    print(len(y_test))
-    print(nn.evaluate(list(zip(X_test, y_test))))
+    # nn = Network([4, 7, 3], epochs=25, eta=0.3)
+    # nn.load_model("model.pkl")
+    # print((nn.evaluate(list(zip(X_test, y_test))) / len(y_test)) * 100)
+    # nn.fit2(X_train, y_train)
 
-    # nn = Network([784, 10, 10], epochs=10, eta=4)
+    # nn = Network([784, 10, 10], epochs=10, eta=3)
     # nn.fit2(np.array(training_inputs), np.array(training_results))
-    # # print(training_inputs[0])
-    # print(len(test_results))
-    # print(nn.evaluate(list(zip(test_inputs, test_results))))
+    # print(training_inputs[0])
+    print((nn.evaluate(list(zip(test_inputs, test_results))) / len(test_results)) * 100)
+    # nn.save_model("model.pkl")
 
 
 if __name__ == "__main__":
