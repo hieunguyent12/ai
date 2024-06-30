@@ -2,3 +2,4 @@ __pycache__
 gtsrb
 assets
 traffic/gtsrb
+.DS_Store
