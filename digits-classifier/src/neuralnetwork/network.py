@@ -1,11 +1,11 @@
 import numpy as np
-from cost import Cost, CostType
-from activation import Activation, ActivationType
 from sklearn.model_selection import train_test_split
 import pickle
 import os
 
-from data_loader import load_iris, load_digits
+from neuralnetwork.cost import Cost, CostType
+from neuralnetwork.activation import Activation, ActivationType
+from neuralnetwork.data_loader import load_iris, load_digits
 
 
 class Neuron:
@@ -134,7 +134,6 @@ def run():
     activation = Activation.init(ActivationType.SIGMOID)
 
     nn = Network(cost, activation)
-    nn.createLayers([28 * 28, 10, 10])
     nn.from_model(model_path)
 
     training_inputs, training_results, test_inputs, test_results = load_digits()
