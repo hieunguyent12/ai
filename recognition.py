@@ -1,6 +1,11 @@
+# from harvard cs50
 import numpy as np
 import pygame
 import sys
+from neuralnetwork.network import Network, Layer, Neuron
+from neuralnetwork.cost import Cost, CostType
+from neuralnetwork.activation import Activation, ActivationType
+from neuralnetwork.data_loader import load_digits
 
 # import tensorflow as tf
 import time
@@ -10,6 +15,13 @@ import time
 #     sys.exit("Usage: python recognition.py model")
 # model = tf.keras.models.load_model(sys.argv[1])
 
+cost = Cost.init(CostType.MSE)
+activation = Activation.init(ActivationType.SIGMOID)
+
+nn = Network(cost, activation)
+nn.createLayers([28 * 28, 10, 10])
+model_path = "model.pkl"
+nn.from_model(model_path)
 # Colors
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
@@ -20,7 +32,7 @@ size = width, height = 600, 400
 screen = pygame.display.set_mode(size)
 
 # Fonts
-OPEN_SANS = "assets/fonts/OpenSans-Regular.ttf"
+OPEN_SANS = None
 smallFont = pygame.font.Font(OPEN_SANS, 20)
 largeFont = pygame.font.Font(OPEN_SANS, 40)
 
@@ -100,7 +112,10 @@ while True:
 
     # Generate classification
     if mouse and classifyButton.collidepoint(mouse):
-        print("predicting")
+        # print([np.array(handwriting).reshape(1, 784)])
+        # print(handwriting)
+        result = nn.feedforward([np.array(handwriting).ravel()])
+        classification = np.argmax(result)
         # classification = model.predict(
         #     [np.array(handwriting).reshape(1, 28, 28, 1)]
         # ).argmax()
