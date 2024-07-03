@@ -15,20 +15,6 @@ def main():
     model_path = "model.pkl"
     nn.from_model(model_path)
 
-    training_inputs, training_results, test_inputs, test_results = load_digits()
-
-    # X_train, X_test, y_train, y_test = train_test_split(
-    #     inputs,
-    #     outputs,
-    #     test_size=0.2,
-    #     random_state=1,
-    #     shuffle=True,
-    # )
-
-    # nn.fit([training_inputs, training_results], epochs=10, eta=0.3, minibatch_size=10)
-    # print((nn.evaluate(list(zip(test_inputs, test_results))) / len(test_results)) * 100)
-    # nn.save_model(model_path)
-
     run(nn)
 
 
