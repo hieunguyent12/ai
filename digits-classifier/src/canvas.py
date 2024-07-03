@@ -3,40 +3,75 @@ import numpy as np
 import math
 
 
+# bad practice, but who cares?
+def create_button_factory(screen, font, buttons):
+
+    def create_button(text_str, rect, subscriber=None):
+        button = pygame.Rect(rect)
+        text = font.render(text_str, True, "black")
+        textRect = text.get_rect()
+        textRect.center = button.center
+
+        buttons.append((button, subscriber))
+
+        def render_button():
+            pygame.draw.rect(screen, "white", button)
+            screen.blit(text, textRect)
+
+        return render_button
+
+    return create_button
+
+
+def notify_buttons(buttons, events):
+    for event in events:
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            for button, subscriber in buttons:
+                if button.collidepoint(event.pos):
+                    if callable(subscriber):
+                        subscriber()
+
+
+def classify(neuralnetwork, pixels, output):
+    results = neuralnetwork.feedforward([np.array(pixels)])
+    output.set(np.argmax(results))
+
+
 class Canvas:
-    def __init__(self, screen, nn):
-        self.pixels = [0] * 784
+    def __init__(self, screen, font, nn):
         self.points = []
         self.screen = screen
         self.pixel_size = 15
-        self.nn = nn
         self.holding = False
+        self.font = font
+        self.nn = nn
 
     def listen(self, events):
         for event in events:
             if event.type == pygame.MOUSEBUTTONDOWN:
                 self.holding = True
-                self.draw()
+                self.collect_mouse_positions()
             elif event.type == pygame.MOUSEBUTTONUP:
                 self.holding = False
             elif event.type == pygame.MOUSEMOTION:
                 if self.holding:
-                    # print(event.pos)
-                    self.draw()
+                    self.collect_mouse_positions()
 
-    def render(self):
+    def draw(self):
         top = 0
         margin = 1
+
         self.pixels = [0] * 784
         for x, y in self.points:
             for i, pixel in enumerate(self.pixels):
                 tileX = i % 28
                 tileY = i // 28
+                # https://github.com/3b1b/3Blue1Brown.com/blob/664e40d59e888f41ae2b595ac248e772bda68954/public/content/lessons/2017/neural-networks/neural-network-interactive/index.js#L921
+                # adjust each pixel's alpha value based on its distance to each mouse coordinates while drawing on the canvas
                 dist = math.hypot(tileX - x, tileY - y)
                 penValue = 0.8 - ((dist / 2) ** 2)
                 penValue = min(max(0, penValue), 1)
-                prev = pixel
-                self.pixels[i] = prev + (1 - prev) * penValue
+                self.pixels[i] = pixel + (1 - pixel) * penValue
 
         for i, pixel in enumerate(self.pixels):
             t = (i % 28) * margin
@@ -48,70 +83,20 @@ class Canvas:
             s.fill((255, 255, 255))
             self.screen.blit(s, rect)
 
-    def render_reset_button(self, events, text="reset"):
-        font_size = 25
-        font = pygame.font.Font(None, font_size)
-        text = font.render(text, True, "black")
+    def reset(self):
+        self.points = []
 
-        width = text.get_size()[0] + 26
-        height = text.get_size()[1] + 26
-        surface = pygame.Surface((width, height))
-        surface.fill("white")
-        surface.blit(text, (13, 13))
-        rect = surface.get_rect(center=(15 + width // 2, 450 + height))
-        self.screen.blit(surface, rect)
-        a = 1
-        for event in events:
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                if rect.collidepoint(event.pos):
-                    self.points = []
+    def get_pixels(self):
+        return self.pixels
 
-    def render_classify_button(self, events, text="classify"):
-        font_size = 25
-        font = pygame.font.Font(None, font_size)
-        text = font.render(text, True, "black")
-
-        width = text.get_size()[0] + 26
-        height = text.get_size()[1] + 26
-        surface = pygame.Surface((width, height))
-        surface.fill("white")
-        surface.blit(text, (13, 13))
-        rect = surface.get_rect(center=(15 + (width // 2) + 220, 450 + height))
-        self.screen.blit(surface, rect)
-
-        for event in events:
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                if rect.collidepoint(event.pos):
-                    results = self.nn.feedforward([np.array(self.pixels)])
-                    print(np.argmax(results))
-
-    def render_preprocess_button(self, events, text="preprocessing"):
-        font_size = 25
-        font = pygame.font.Font(None, font_size)
-        text = font.render(text, True, "black")
-
-        width = text.get_size()[0] + 26
-        height = text.get_size()[1] + 26
-        surface = pygame.Surface((width, height))
-        surface.fill("white")
-        surface.blit(text, (13, 13))
-        rect = surface.get_rect(center=(15 + width // 2 + 70, 450 + height))
-        self.screen.blit(surface, rect)
-
-        for event in events:
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                if rect.collidepoint(event.pos):
-                    self.preprocess()
-
+    # https://github.com/3b1b/3Blue1Brown.com/blob/664e40d59e888f41ae2b595ac248e772bda68954/public/content/lessons/2017/neural-networks/neural-network-interactive/index.js#L947
+    # calculate the "center of mass" of the pixels and using it to center them
     def preprocess(self):
-        left = math.inf
-        right = -math.inf
-        top = math.inf
-        bottom = -math.inf
-
         centerX = 0
         centerY = 0
         totalValue = 0
+        # size of canvas which is 28x28 pixels, divided by 2 to get location of center
+        center_offset = 28 / 2
 
         for i, pixel in enumerate(self.pixels):
             x = i % 28
@@ -121,22 +106,22 @@ class Canvas:
             centerY += y * pixel
             totalValue += pixel
 
-            if pixel > 0.05:
-                left = min(left, x)
-                right = max(right, x)
-                top = min(top, y)
-                bottom = max(bottom, y)
-
         centerX /= totalValue
         centerY /= totalValue
 
         for i, _ in enumerate(self.points):
             old = self.points[i]
-            newX = (old[0] - centerX) + 14
-            newY = (old[1] - centerY) + 14
-            self.points[i] = (old[0] + (newX - old[0]), old[1] + (newY - old[1]))
 
-    def draw(self):
+            # subtracting the center of mass from each individual points will shift the points
+            # back to the origin 0, 0
+            newX = old[0] - centerX
+            newY = old[1] - centerY
+
+            # now that the points are relative to the origin, we add a center_offset to bring them to
+            # the center of the canvas
+            self.points[i] = (newX + center_offset, newY + center_offset)
+
+    def collect_mouse_positions(self):
         mouse_x, mouse_y = pygame.mouse.get_pos()
         if (
             mouse_x <= 15 + (self.pixel_size + 1) * 28
@@ -147,33 +132,76 @@ class Canvas:
             x = (mouse_x / (15 + (self.pixel_size + 1) * 28)) * 28
             y = (mouse_y / (15 + (self.pixel_size + 1) * 28)) * 28
             self.points.append((x - 1, y - 1))
+            # x = (mouse_x - 15) / (self.pixel_size + 1)
+            # y = (mouse_y - 15) / (self.pixel_size + 1)
+            # self.points.append((x, y))
 
-            # x = int((mouse_x - 15) / (self.pixel_size + 1))
-            # y = int((mouse_y - 15) / (self.pixel_size + 1))
-            # self.pixels[y * 28 + x] = (0, 0, 0)
+
+class Output:
+    def __init__(self, font, initial_value=None):
+        self.output = initial_value
+        self.font = font
+
+    def get(self):
+        return self.output
+
+    def set(self, new):
+        self.output = new
+
+    def draw(self, screen):
+        text_str = (
+            "Output: {}".format(self.output) if self.output is not None else "Output:"
+        )
+        text = self.font.render(text_str, True, "white")
+        textRect = text.get_rect()
+        textRect.center = (50, 550)
+        screen.blit(text, textRect)
 
 
 def run(nn):
+    WIDTH, HEIGHT = 475, 600
     # pygame setup
     pygame.init()
-    screen = pygame.display.set_mode((800, 800), flags=pygame.SRCALPHA)
+    screen = pygame.display.set_mode((WIDTH, HEIGHT))
     clock = pygame.time.Clock()
-    running = True
-    canvas = Canvas(screen, nn)
+    font = pygame.font.Font("fonts/OpenSans-Regular.ttf", 20)
 
+    canvas = Canvas(screen, font, nn)
+    output = Output(font)
+
+    buttons = []
+    create_btn = create_button_factory(screen, font, buttons)
+    draw_reset_btn = create_btn(
+        "reset", (15, 478, 100, 30), lambda: [canvas.reset(), output.set(None)]
+    )
+    draw_preprocess_btn = create_btn(
+        "preprocess", (130, 478, 150, 30), canvas.preprocess
+    )
+    draw_classify_btn = create_btn(
+        "classify",
+        (290, 478, 120, 30),
+        lambda: classify(nn, canvas.get_pixels(), output),
+    )
+
+    running = True
     while running:
         events = pygame.event.get()
         for event in events:
             if event.type == pygame.QUIT:
                 running = False
 
+        # "clear" screen
         screen.fill("#202020")
 
-        canvas.render()
+        canvas.draw()
+        output.draw(screen)
+        draw_reset_btn()
+        draw_preprocess_btn()
+        draw_classify_btn()
+
         canvas.listen(events)
-        canvas.render_reset_button(events)
-        canvas.render_preprocess_button(events)
-        canvas.render_classify_button(events)
+        notify_buttons(buttons, events)
+
         pygame.display.flip()
         clock.tick(60)
 
