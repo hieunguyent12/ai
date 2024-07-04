@@ -1,6 +1,7 @@
 import pygame
 import numpy as np
 import math
+from scipy import ndimage
 
 
 # bad practice, but who cares?
@@ -45,6 +46,8 @@ class Canvas:
         self.holding = False
         self.font = font
         self.nn = nn
+        self.centerX = None
+        self.centerY = None
 
     def listen(self, events):
         for event in events:
@@ -66,11 +69,13 @@ class Canvas:
             for i, pixel in enumerate(self.pixels):
                 tileX = i % 28
                 tileY = i // 28
-                # https://github.com/3b1b/3Blue1Brown.com/blob/664e40d59e888f41ae2b595ac248e772bda68954/public/content/lessons/2017/neural-networks/neural-network-interactive/index.js#L921
+                # https://github.com/3b1b/3Blue1Brown.com/blob/main/public/content/lessons/2017/neural-networks/neural-network-interactive/index.js#L927
                 # adjust each pixel's alpha value based on its distance to each mouse coordinates while drawing on the canvas
                 dist = math.hypot(tileX - x, tileY - y)
-                penValue = 0.8 - ((dist / 2) ** 2)
-                penValue = min(max(0, penValue), 1)
+                penValue = 0.8 - (
+                    (dist / 2) ** 2
+                )  # i don't know if there is a name for this or if this equation was chosen arbitrarily
+                penValue = min(max(0, penValue), 1)  # keep it between 0 and 1
                 self.pixels[i] = pixel + (1 - pixel) * penValue
 
         for i, pixel in enumerate(self.pixels):
@@ -83,31 +88,31 @@ class Canvas:
             s.fill((255, 255, 255))
             self.screen.blit(s, rect)
 
+        # if self.centerX is not None and self.centerY is not None:
+        #     x = ((self.centerX % 28) + 1) * (self.pixel_size + 1) - (
+        #         self.pixel_size + 1
+        #     ) / 2
+        #     y = self.centerY * (self.pixel_size + 1) + (self.pixel_size + 1) / 2
+        #     pygame.draw.circle(self.screen, "red", (x + 15, y + 15), 10)
+
     def reset(self):
         self.points = []
+        self.centerX = None
+        self.centerY = None
 
     def get_pixels(self):
         return self.pixels
 
-    # https://github.com/3b1b/3Blue1Brown.com/blob/664e40d59e888f41ae2b595ac248e772bda68954/public/content/lessons/2017/neural-networks/neural-network-interactive/index.js#L947
-    # calculate the "center of mass" of the pixels and using it to center them
+    # https://github.com/3b1b/3Blue1Brown.com/blob/main/public/content/lessons/2017/neural-networks/neural-network-interactive/index.js#L959
+    # # calculate the "center of mass" of the pixels and using it to center them
+
+    # another possible way of doing this is to get the "bouding rect" of the pixels
+    # and use that to center it. The bounding rect's height would be the location y
+    # of the furthest pixel at the top minus the furthest pixel at bottom. same thing for the width
     def preprocess(self):
-        centerX = 0
-        centerY = 0
-        totalValue = 0
-        # size of canvas which is 28x28 pixels, divided by 2 to get location of center
+        pixels = np.array(self.pixels).reshape((-1, 28))
+        centerY, centerX = ndimage.center_of_mass(pixels)
         center_offset = 28 / 2
-
-        for i, pixel in enumerate(self.pixels):
-            x = i % 28
-            y = i // 28
-
-            centerX += x * pixel
-            centerY += y * pixel
-            totalValue += pixel
-
-        centerX /= totalValue
-        centerY /= totalValue
 
         for i, _ in enumerate(self.points):
             old = self.points[i]
@@ -162,6 +167,7 @@ def run(nn):
     WIDTH, HEIGHT = 475, 600
     # pygame setup
     pygame.init()
+    pygame.display.set_caption("digits classifier 🤖")
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     clock = pygame.time.Clock()
     font = pygame.font.Font("fonts/OpenSans-Regular.ttf", 20)
